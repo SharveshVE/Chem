@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cheminformatics Virtual Laboratory | SHARVESH V E</title>
+    <!-- 3Dmol.js for 3D Interactive Visualization -->
+    <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+    <!-- SmilesDrawer for 2D Canvas Rendering -->
+    <script src="https://unpkg.com/smiles-drawer@1.2.0/dist/smiles-drawer.min.js"></script>
+    <!-- Chart.js for Structure-Property Plots -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-sidebar: #1e293b;
+            --bg-card: #1e293b;
+            --accent: #38bdf8;
+            --accent-hover: #0284c7;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --pass: #22c55e;
+            --fail: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 280px;
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 1.35rem;
+            margin-bottom: 20px;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            text-align: left;
+            padding: 12px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover {
+            background-color: rgba(56, 189, 248, 0.1);
+            color: var(--text-primary);
+        }
+
+        .nav-btn.active {
+            background-color: var(--accent);
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        .student-box {
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .student-box strong {
+            color: var(--accent);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            flex: 1;
+            padding: 32px 48px;
+            max-width: 1250px;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            font-size: 1.05rem;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card h3 {
+            margin-bottom: 14px;
+            color: var(--accent);
+            font-size: 1.15rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .metric-label {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 1.55rem;
+            font-weight: 700;
+            margin-top: 6px;
+            color: var(--text-primary);
+        }
+
+        /* Generated SMILES Banner */
+        .smiles-banner {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .smiles-code-text {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 1.15rem;
+            color: #38bdf8;
+            word-break: break-all;
+            margin-top: 4px;
+        }
+
+        .iupac-text {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Inputs & Buttons */
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"], select, textarea {
+            background-color: #0f172a;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            flex: 1;
+            min-width: 240px;
+        }
+
+        button.primary-btn {
+            background-color: var(--accent);
+            color: #0f172a;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button.primary-btn:hover {
+            background-color: var(--accent-hover);
+            color: white;
+        }
+
+        .chip-container {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .chip {
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: var(--accent);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .chip:hover {
+            background: var(--accent);
+            color: #0f172a;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.92rem;
+        }
+
+        th, td {
+            border-bottom: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: rgba(15, 23, 42, 0.5);
+            color: var(--accent);
+        }
+
+        .viewer-box {
+            width: 100%;
+            height: 360px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #viewer3d {
+            width: 100%;
+            height: 360px;
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .badge-pass {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--pass);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .badge-fail {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--fail);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        ul {
+            padding-left: 20px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+
+        .status-msg {
+            margin-bottom: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2>🧪 Virtual Lab</h2>
+        <button class="nav-btn active" onclick="switchTab('home', this)">🏠 Home</button>
+        <button class="nav-btn" onclick="switchTab('theory', this)">📖 Theory</button>
+        <button class="nav-btn" onclick="switchTab('search', this)">🔍 Search Molecule by Name</button>
+        <button class="nav-btn" onclick="switchTab('batch', this)">📈 Batch Molecule Analysis</button>
+        <button class="nav-btn" onclick="switchTab('quiz', this)">📝 Assessment</button>
+        <button class="nav-btn" onclick="switchTab('student', this)">👩‍🎓 Student Information</button>
+
+        <div class="student-box">
+            <div><strong>👩‍🎓 Student Details</strong></div>
+            <div>Name: <strong>SHARVESH V E</strong></div>
+            <div>Reg No: <strong>RA2611026050160</strong></div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- 1. HOME -->
+        <section id="home" class="section active">
+            <h1>🧪 Cheminformatics Virtual Laboratory</h1>
+            <p class="subtitle">Interactive Web Portal for Drug Name-to-SMILES Generation & Molecular Analysis</p>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3>🎓 Learning Objectives</h3>
+                    <ul>
+                        <li>Convert any <strong>Drug or Chemical Name</strong> into its canonical <strong>SMILES notation</strong>.</li>
+                        <li>Validate chemical structures and generate <strong>2D depictions</strong>.</li>
+                        <li>Interact with <strong>3D molecular conformations</strong> in real time.</li>
+                        <li>Calculate molecular descriptors & evaluate <strong>Lipinski's Rule of Five</strong>.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>✅ What Can You Do Here?</h3>
+                    <ul>
+                        <li>🔍 Type <strong>any Drug or Molecule Name</strong> (e.g., <em>Aspirin, Ibuprofen, Caffeine</em>) to get its SMILES code automatically.</li>
+                        <li>📋 Copy the generated SMILES notation with a single click.</li>
+                        <li>📂 Upload a list of molecule names (<code>.txt</code> or <code>.csv</code>) to generate a batch SMILES & property table.</li>
+                        <li>📥 Download complete Molecular Properties Reports as CSV files.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📋 Sample Drug Molecules (Click "Analyze" to generate SMILES & 3D Structure)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Drug / Molecule Name</th>
+                            <th>Therapeutic Class</th>
+                            <th>Generated SMILES Notation</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Aspirin</strong></td>
+                            <td>Analgesic / Antiplatelet</td>
+                            <td><code>CC(=O)OC1=CC=CC=C1C(=O)O</code></td>
+                            <td><button class="chip" onclick="quickLoad('Aspirin')">Analyze →</button></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Paracetamol</strong></td>
+                            <td>Antipyretic / Analgesic</td>
+                            <td><code>CC(=O)NC1=CC=C(C=C1)O</code></td>
+                            <td><button class="chip" onclick="quickLoad('Paracetamol')">Analyze →</button></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Ibuprofen</strong></td>
+                            <td>NSAID Pain Reliever</td>
+                            <td><code>CC(C)CC1=CC=C(C=C1)C(C)C(=O)O</code></td>
+                            <td><button class="chip" onclick="quickLoad('Ibuprofen')">Analyze →</button></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Caffeine</strong></td>
+                            <td>CNS Stimulant</td>
+                            <td><code>CN1C=NC2=C1C(=O)N(C(=O)N2C)C</code></td>
+                            <td><button class="chip" onclick="quickLoad('Caffeine')">Analyze →</button></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Amoxicillin</strong></td>
+                            <td>Beta-Lactam Antibiotic</td>
+                            <td><code>CC1(C(N2C(S1)C(C2=O)NC(=O)C(C3=CC=C(C=C3)O)N)C(=O)O)C</code></td>
+                            <td><button class="chip" onclick="quickLoad('Amoxicillin')">Analyze →</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 2. THEORY -->
+        <section id="theory" class="section">
+            <h1>📖 Theoretical Concepts</h1>
+            <p class="subtitle">Fundamental Principles of Cheminformatics & Computational Drug Design</p>
+
+            <div class="card">
+                <h3>1. Name-to-SMILES Conversion</h3>
+                <p style="color: var(--text-secondary); line-height: 1.7; margin-bottom: 12px;">
+                    <strong>SMILES</strong> (Simplified Molecular-Input Line-Entry System) represents chemical structures using short ASCII strings. When you enter a common drug name (such as <em>Paracetamol</em> or <em>Ibuprofen</em>), this virtual lab queries chemical databases to resolve its molecular graph and output its unique <strong>Canonical SMILES code</strong>.
+                </p>
+                <ul>
+                    <li><strong>Atoms:</strong> Represented by chemical symbols (<code>C</code>, <code>N</code>, <code>O</code>, <code>Cl</code>).</li>
+                    <li><strong>Bonds:</strong> Single bonds are implied or <code>-</code>, double bonds are <code>=</code>, triple bonds are <code>#</code>.</li>
+                    <li><strong>Branches:</strong> Enclosed inside parentheses, e.g., <code>CC(=O)O</code> for Acetic Acid.</li>
+                    <li><strong>Ring Structures:</strong> Numbers indicate ring closures, e.g., <code>C1=CC=CC=C1</code> for Benzene.</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>2. Lipinski's Rule of Five (Drug-Likeness)</h3>
+                <p style="color: var(--text-secondary); line-height: 1.7; margin-bottom: 12px;">
+                    Lipinski's Rule of Five evaluates whether a chemical compound has properties that make it likely to be an orally active drug in humans. A compound passes if it has <strong>no more than 1 violation</strong> of these rules:
+                </p>
+                <ul>
+                    <li><strong>Molecular Weight (MW):</strong> &le; 500 g/mol</li>
+                    <li><strong>Lipophilicity (XLogP):</strong> &le; 5</li>
+                    <li><strong>Hydrogen Bond Donors (HBD):</strong> &le; 5</li>
+                    <li><strong>Hydrogen Bond Acceptors (HBA):</strong> &le; 10</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 3. SEARCH BY MOLECULE NAME -->
+        <section id="search" class="section">
+            <h1>🔍 Search Molecule by Name</h1>
+            <p class="subtitle">Type any Drug or Chemical Name below to automatically get its SMILES code, 2D/3D structure, and molecular properties.</p>
+
+            <div class="search-bar">
+                <input type="text" id="moleculeNameInput" value="Aspirin" placeholder="Enter any Drug or Molecule Name (e.g., Paracetamol, Ibuprofen, Metformin, Glucose)..." onkeydown="if(event.key==='Enter') analyzeSingleMolecule()">
+                <select id="style3d" onchange="update3DStyle()" style="max-width: 190px;">
+                    <option value="stick">3D Style: Stick</option>
+                    <option value="sphere">3D Style: Sphere (CPK)</option>
+                    <option value="line">3D Style: Wireframe</option>
+                </select>
+                <button class="primary-btn" onclick="analyzeSingleMolecule()">🔍 Get SMILES & Analyze</button>
+            </div>
+
+            <div class="chip-container">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; align-self: center;">Quick Drug Search:</span>
+                <span class="chip" onclick="quickLoad('Aspirin')">Aspirin</span>
+                <span class="chip" onclick="quickLoad('Paracetamol')">Paracetamol</span>
+                <span class="chip" onclick="quickLoad('Ibuprofen')">Ibuprofen</span>
+                <span class="chip" onclick="quickLoad('Caffeine')">Caffeine</span>
+                <span class="chip" onclick="quickLoad('Metformin')">Metformin</span>
+                <span class="chip" onclick="quickLoad('Amoxicillin')">Amoxicillin</span>
+                <span class="chip" onclick="quickLoad('Omeprazole')">Omeprazole</span>
+                <span class="chip" onclick="quickLoad('Atorvastatin')">Atorvastatin</span>
+            </div>
+
+            <div id="statusMsg" class="status-msg"></div>
+
+            <!-- Highlighted Generated SMILES Box -->
+            <div class="smiles-banner">
+                <div style="flex: 1;">
+                    <div class="metric-label">🧪 Generated Canonical SMILES Code</div>
+                    <div class="smiles-code-text" id="generatedSmilesDisplay">-</div>
+                    <div class="iupac-text" id="generatedIupacDisplay">IUPAC Name: -</div>
+                </div>
+                <button class="primary-btn" onclick="copySmilesCode()" id="copySmilesBtn" style="padding: 10px 16px; font-size: 0.88rem;">📋 Copy SMILES</button>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3>🧬 2D Molecular Structure</h3>
+                    <div class="viewer-box">
+                        <canvas id="smilesCanvas" width="420" height="340"></canvas>
+                        <img id="fallback2d" style="display:none; max-height: 330px;" alt="2D Structure">
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>🧊 Interactive 3D Structure (Drag to Rotate, Scroll to Zoom)</h3>
+                    <div id="viewer3d"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3 style="margin: 0;">📊 Molecular Properties Report</h3>
+                    <button class="primary-btn" onclick="downloadSingleCSV()" style="padding: 8px 14px; font-size: 0.85rem;">📥 Download Report (CSV)</button>
+                </div>
+
+                <div class="grid-4">
+                    <div class="metric-card">
+                        <div class="metric-label">Molecular Formula</div>
+                        <div class="metric-value" id="propFormula">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Molecular Weight</div>
+                        <div class="metric-value" id="propMW">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">LogP (XLogP)</div>
+                        <div class="metric-value" id="propLogP">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Lipinski Drug-Likeness</div>
+                        <div class="metric-value" id="propRo5">-</div>
+                    </div>
+                </div>
+
+                <div class="grid-4">
+                    <div class="metric-card">
+                        <div class="metric-label">H-Bond Donors (HBD)</div>
+                        <div class="metric-value" id="propHBD">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">H-Bond Acceptors (HBA)</div>
+                        <div class="metric-value" id="propHBA">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">TPSA (Polar Area)</div>
+                        <div class="metric-value" id="propTPSA">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Rotatable Bonds</div>
+                        <div class="metric-value" id="propRot">-</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. BATCH MOLECULE NAME ANALYSIS -->
+        <section id="batch" class="section">
+            <h1>📈 Batch Molecule Name Analysis & SMILES Generator</h1>
+            <p class="subtitle">Enter multiple Drug/Molecule Names (one per line) or upload a <code>.txt</code> / <code>.csv</code> file to generate their SMILES codes and compare properties.</p>
+
+            <div class="card">
+                <h3>📂 Upload Molecule Names File or Edit List (One Molecule Name per line)</h3>
+                <input type="file" id="smilesFile" accept=".txt,.csv" onchange="handleFileUpload(event)" style="margin-bottom: 12px; display: block;">
+                <textarea id="batchInput" rows="5" style="width: 100%; margin-bottom: 12px;">Aspirin
+Paracetamol
+Ibuprofen
+Caffeine
+Metformin</textarea>
+                <div style="display: flex; gap: 12px;">
+                    <button class="primary-btn" onclick="runBatchAnalysis()">🚀 Generate SMILES & Compare</button>
+                    <button class="primary-btn" onclick="downloadBatchCSV()" style="background: #334155; color: white;">📥 Export Table with SMILES (CSV)</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📋 Multi-Molecule SMILES & Property Comparison Table</h3>
+                <div style="overflow-x: auto;">
+                    <table id="batchTable">
+                        <thead>
+                            <tr>
+                                <th>Molecule Name</th>
+                                <th>Generated SMILES Code</th>
+                                <th>Formula</th>
+                                <th>MW (g/mol)</th>
+                                <th>LogP</th>
+                                <th>HBD</th>
+                                <th>HBA</th>
+                                <th>TPSA (Å²)</th>
+                                <th>Lipinski Ro5</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📊 Structure–Property Relationship (Molecular Weight vs. LogP)</h3>
+                <canvas id="sprChart" height="110"></canvas>
+            </div>
+        </section>
+
+        <!-- 5. ASSESSMENT -->
+        <section id="quiz" class="section">
+            <h1>📝 Self-Assessment Quiz</h1>
+            <p class="subtitle">Evaluate your understanding of SMILES representations and Lipinski's Rule of Five.</p>
+
+            <div class="card">
+                <h3>Question 1: What is the maximum Molecular Weight threshold in Lipinski's Rule of Five?</h3>
+                <label><input type="radio" name="q1" value="a"> 250 Da</label><br><br>
+                <label><input type="radio" name="q1" value="b"> 500 Da</label><br><br>
+                <label><input type="radio" name="q1" value="c"> 1000 Da</label>
+            </div>
+
+            <div class="card">
+                <h3>Question 2: What does SMILES stand for in Cheminformatics?</h3>
+                <label><input type="radio" name="q2" value="a"> Simple Molecular Interactive Line System</label><br><br>
+                <label><input type="radio" name="q2" value="b"> Simplified Molecular-Input Line-Entry System</label><br><br>
+                <label><input type="radio" name="q2" value="c"> Structural Modeling In Linear Element System</label>
+            </div>
+
+            <div class="card">
+                <h3>Question 3: In SMILES notation, what symbol denotes a double bond?</h3>
+                <label><input type="radio" name="q3" value="a"> =</label><br><br>
+                <label><input type="radio" name="q3" value="b"> #</label><br><br>
+                <label><input type="radio" name="q3" value="c"> -</label>
+            </div>
+
+            <button class="primary-btn" onclick="gradeQuiz()">Submit Assessment</button>
+            <div id="quizResult" style="margin-top: 16px; font-size: 1.2rem; font-weight: 700;"></div>
+        </section>
+
+        <!-- 6. STUDENT INFORMATION -->
+        <section id="student" class="section">
+            <h1>👩‍🎓 Student Information</h1>
+            <p class="subtitle">Project Developer & Academic Details</p>
+
+            <div class="card">
+                <h3>👤 Developer Profile</h3>
+                <p style="font-size: 1.1rem; line-height: 2;">
+                    <strong>Student Name:</strong> SHARVESH V E<br>
+                    <strong>Registration Number:</strong> RA2611026050160<br>
+                    <strong>Project Title:</strong> Cheminformatics Virtual Laboratory – Drug Name to SMILES & Molecular Property Analyzer<br>
+                    <strong>Technologies Used:</strong> HTML5, CSS3, JavaScript, PubChem PUG REST API, SmilesDrawer, 3Dmol.js
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        let viewer3D = null;
+        let currentSingleData = null;
+        let batchDataStore = [];
+        let sprChartInstance = null;
+
+        // Navigation Switcher
+        function switchTab(tabId, btnElement) {
+            document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (btnElement) btnElement.classList.add('active');
+
+            if (tabId === 'search' && !currentSingleData) {
+                analyzeSingleMolecule();
+            }
+            if (tabId === 'batch' && batchDataStore.length === 0) {
+                runBatchAnalysis();
+            }
+        }
+
+        function quickLoad(moleculeName) {
+            document.getElementById('moleculeNameInput').value = moleculeName;
+            const searchBtn = document.querySelectorAll('.nav-btn')[2];
+            switchTab('search', searchBtn);
+            analyzeSingleMolecule();
+        }
+
+        // Copy SMILES to Clipboard
+        function copySmilesCode() {
+            const smilesText = document.getElementById('generatedSmilesDisplay').innerText;
+            if (!smilesText || smilesText === '-') return;
+            navigator.clipboard.writeText(smilesText);
+            const btn = document.getElementById('copySmilesBtn');
+            btn.innerText = '✅ Copied!';
+            setTimeout(() => { btn.innerText = '📋 Copy SMILES'; }, 1800);
+        }
+
+        // Draw 2D Structure using SmilesDrawer or PubChem fallback
+        function draw2DStructure(smiles, cid) {
+            const canvas = document.getElementById('smilesCanvas');
+            const fallbackImg = document.getElementById('fallback2d');
+            try {
+                let smilesDrawer = new SmilesDrawer.Drawer({ width: 420, height: 340 });
+                SmilesDrawer.parse(smiles, function(tree) {
+                    canvas.style.display = 'block';
+                    fallbackImg.style.display = 'none';
+                    smilesDrawer.draw(tree, 'smilesCanvas', 'light', false);
+                }, function(err) {
+                    canvas.style.display = 'none';
+                    fallbackImg.style.display = 'block';
+                    fallbackImg.src = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/PNG`;
+                });
+            } catch (e) {
+                canvas.style.display = 'none';
+                fallbackImg.style.display = 'block';
+                fallbackImg.src = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/PNG`;
+            }
+        }
+
+        // Fetch SMILES & Properties from PubChem primarily by Molecule Name
+        async function fetchMoleculeDataByName(query) {
+            const cleanQuery = query.trim();
+            const propsList = "MolecularFormula,MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,TPSA,RotatableBondCount,CanonicalSMILES,IsomericSMILES,IUPACName";
+            
+            // Search by Molecule/Drug Name first
+            let url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanQuery)}/property/${propsList}/JSON`;
+            let res = await fetch(url);
+            
+            // Fallback in case user still pastes a SMILES string
+            if (!res.ok) {
+                url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(cleanQuery)}/property/${propsList}/JSON`;
+                res = await fetch(url);
+            }
+            if (!res.ok) throw new Error("Molecule name not found in database");
+            
+            const data = await res.json();
+            return data.PropertyTable.Properties[0];
+        }
+
+        // Analyze Single Molecule by Name
+        async function analyzeSingleMolecule() {
+            const query = document.getElementById('moleculeNameInput').value.trim();
+            const statusBox = document.getElementById('statusMsg');
+            if (!query) return;
+
+            statusBox.style.display = 'block';
+            statusBox.style.background = 'rgba(56, 189, 248, 0.15)';
+            statusBox.style.color = '#38bdf8';
+            statusBox.innerText = `⏳ Searching "${query}" and generating SMILES notation...`;
+
+            try {
+                const props = await fetchMoleculeDataByName(query);
+                const smiles = props.CanonicalSMILES || props.IsomericSMILES || props.ConnectivitySMILES || '-';
+                currentSingleData = { name: query, smiles: smiles, ...props };
+
+                statusBox.style.background = 'rgba(34, 197, 94, 0.15)';
+                statusBox.style.color = '#22c55e';
+                statusBox.innerText = `✅ Molecule Found: ${query.toUpperCase()} (PubChem CID: ${props.CID})`;
+
+                // Display Generated SMILES & IUPAC Name
+                document.getElementById('generatedSmilesDisplay').innerText = smiles;
+                document.getElementById('generatedIupacDisplay').innerText = `IUPAC Name: ${props.IUPACName || 'N/A'}`;
+
+                // 2D Render
+                draw2DStructure(smiles, props.CID);
+
+                // 3D Render
+                render3DMolecule(props.CID);
+
+                // Update Metrics
+                const mw = parseFloat(props.MolecularWeight || 0);
+                const logp = parseFloat(props.XLogP ?? 0);
+                const hbd = parseInt(props.HBondDonorCount || 0);
+                const hba = parseInt(props.HBondAcceptorCount || 0);
+                const violations = (mw > 500 ? 1 : 0) + (logp > 5 ? 1 : 0) + (hbd > 5 ? 1 : 0) + (hba > 10 ? 1 : 0);
+
+                document.getElementById('propFormula').innerText = props.MolecularFormula || '-';
+                document.getElementById('propMW').innerText = `${mw.toFixed(2)} g/mol`;
+                document.getElementById('propLogP').innerText = props.XLogP !== undefined ? logp.toFixed(2) : 'N/A';
+                document.getElementById('propHBD').innerText = hbd;
+                document.getElementById('propHBA').innerText = hba;
+                document.getElementById('propTPSA').innerText = `${props.TPSA || 0} Å²`;
+                document.getElementById('propRot').innerText = props.RotatableBondCount || 0;
+                document.getElementById('propRo5').innerHTML = violations <= 1 
+                    ? `<span class="badge-pass">Pass (${violations} Viol.)</span>` 
+                    : `<span class="badge-fail">Fail (${violations} Viol.)</span>`;
+
+            } catch (err) {
+                statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
+                statusBox.style.color = '#ef4444';
+                statusBox.innerText = `❌ Could not find molecule "${query}". Please check the spelling (e.g., Aspirin, Paracetamol, Ibuprofen).`;
+            }
+        }
+
+        // Render 3D Conformer via 3Dmol.js
+        function render3DMolecule(cid) {
+            const container = document.getElementById('viewer3d');
+            container.innerHTML = '';
+            viewer3D = $3Dmol.createViewer(container, { backgroundColor: '#0f172a' });
+
+            $3Dmol.download(`cid:${cid}`, viewer3D, {}, function() {
+                update3DStyle();
+                viewer3D.zoomTo();
+                viewer3D.render();
+            });
+        }
+
+        function update3DStyle() {
+            if (!viewer3D) return;
+            const style = document.getElementById('style3d').value;
+            viewer3D.setStyle({}, {});
+            if (style === 'stick') viewer3D.setStyle({}, { stick: { radius: 0.2 } });
+            if (style === 'sphere') viewer3D.setStyle({}, { sphere: { scale: 0.3 }, stick: { radius: 0.15 } });
+            if (style === 'line') viewer3D.setStyle({}, { line: {} });
+            viewer3D.render();
+        }
+
+        // Handle .txt / .csv File Upload of Molecule Names
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split(/\r?\n/)
+                    .map(l => l.trim().split(',')[0])
+                    .filter(Boolean);
+                document.getElementById('batchInput').value = lines.join('\n');
+                runBatchAnalysis();
+            };
+            reader.readAsText(file);
+        }
+
+        // Batch Analysis by Molecule Name
+        async function runBatchAnalysis() {
+            const lines = document.getElementById('batchInput').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+            const tbody = document.getElementById('batchTableBody');
+            tbody.innerHTML = '<tr><td colspan="9">⏳ Fetching SMILES codes and descriptors for molecule names...</td></tr>';
+            batchDataStore = [];
+
+            for (const name of lines) {
+                try {
+                    const p = await fetchMoleculeDataByName(name);
+                    const smiles = p.CanonicalSMILES || p.IsomericSMILES || '-';
+                    const mw = parseFloat(p.MolecularWeight || 0);
+                    const logp = parseFloat(p.XLogP ?? 0);
+                    const hbd = parseInt(p.HBondDonorCount || 0);
+                    const hba = parseInt(p.HBondAcceptorCount || 0);
+                    const v = (mw > 500 ? 1 : 0) + (logp > 5 ? 1 : 0) + (hbd > 5 ? 1 : 0) + (hba > 10 ? 1 : 0);
+                    batchDataStore.push({
+                        name: name,
+                        smiles: smiles,
+                        formula: p.MolecularFormula,
+                        mw: mw,
+                        logp: logp,
+                        hbd: hbd,
+                        hba: hba,
+                        tpsa: p.TPSA || 0,
+                        ro5: v <= 1 ? 'Pass' : 'Fail'
+                    });
+                } catch (e) {
+                    // Skip invalid molecule name
+                }
+            }
+
+            tbody.innerHTML = '';
+            batchDataStore.forEach(row => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${row.name}</strong></td>
+                        <td><code style="color:#38bdf8;">${row.smiles}</code></td>
+                        <td>${row.formula}</td>
+                        <td>${row.mw.toFixed(2)}</td>
+                        <td>${row.logp.toFixed(2)}</td>
+                        <td>${row.hbd}</td>
+                        <td>${row.hba}</td>
+                        <td>${row.tpsa}</td>
+                        <td><span class="${row.ro5 === 'Pass' ? 'badge-pass' : 'badge-fail'}">${row.ro5}</span></td>
+                    </tr>
+                `;
+            });
+
+            renderSPRChart();
+        }
+
+        function renderSPRChart() {
+            const ctx = document.getElementById('sprChart').getContext('2d');
+            if (sprChartInstance) sprChartInstance.destroy();
+
+            sprChartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Drug Molecules (MW vs LogP)',
+                        data: batchDataStore.map(d => ({ x: d.mw, y: d.logp, label: d.name })),
+                        backgroundColor: '#38bdf8',
+                        pointRadius: 7
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: { title: { display: true, text: 'Molecular Weight (g/mol)', color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#f8fafc' } },
+                        y: { title: { display: true, text: 'LogP (Lipophilicity)', color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#f8fafc' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#f8fafc' } }
+                    }
+                }
+            });
+        }
+
+        // CSV Exports (Now includes Molecule Name and Generated SMILES)
+        function downloadSingleCSV() {
+            if (!currentSingleData) return;
+            const d = currentSingleData;
+            const csv = `MoleculeName,GeneratedSMILES,Formula,MolecularWeight,XLogP,HBD,HBA,TPSA,RotatableBonds\n"${d.name}","${d.smiles}",${d.MolecularFormula},${d.MolecularWeight},${d.XLogP},${d.HBondDonorCount},${d.HBondAcceptorCount},${d.TPSA},${d.RotatableBondCount}`;
+            triggerDownload(csv, `${d.name}_report.csv`);
+        }
+
+        function downloadBatchCSV() {
+            if (!batchDataStore.length) return;
+            let csv = "Molecule_Name,Generated_SMILES,Formula,MW,LogP,HBD,HBA,TPSA,Lipinski_Ro5\n";
+            batchDataStore.forEach(r => {
+                csv += `"${r.name}","${r.smiles}",${r.formula},${r.mw},${r.logp},${r.hbd},${r.hba},${r.tpsa},${r.ro5}\n`;
+            });
+            triggerDownload(csv, "batch_molecules_smiles_report.csv");
+        }
+
+        function triggerDownload(csvContent, fileName) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+        }
+
+        // Assessment Grader
+        function gradeQuiz() {
+            let score = 0;
+            if (document.querySelector('input[name="q1"]:checked')?.value === 'b') score++;
+            if (document.querySelector('input[name="q2"]:checked')?.value === 'b') score++;
+            if (document.querySelector('input[name="q3"]:checked')?.value === 'a') score++;
+            const res = document.getElementById('quizResult');
+            res.style.color = score === 3 ? '#22c55e' : '#38bdf8';
+            res.innerText = `🎯 You scored ${score} / 3!`;
+        }
+    </script>
+</body>
+</html>
